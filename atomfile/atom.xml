@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id/>
+    <title>Events Feed</title>
+    <updated>2023-10-31T10:16:25.144Z</updated>
+    <generator>https://github.com/jpmonette/feed</generator>
+    <author>
+        <name>FDLA Class</name>
+    </author>
+    <entry>
+        <title type="html"><![CDATA[TEST]]></title>
+        <id>9d58eea7-af9e-40a4-b6a5-90ffafe46d40</id>
+        <link href="TEST"/>
+        <updated>2023-10-30T12:36:03.227Z</updated>
+        <author>
+            <name>TEST</name>
+        </author>
+        <published>2023-10-30T12:36:03.227Z</published>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[Garden night]]></title>
+        <id>urn:uuid:75e661d3-9d63-46e2-89da-535b85b94e35</id>
+        <link href="http://example.org/foobar"/>
+        <updated>2023-10-04T16:09:58.000Z</updated>
+        <author>
+            <name>Julia Lang</name>
+        </author>
+        <published>2023-10-03T10:03:08.000Z</published>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[TEST]]></title>
+        <id>0d4db8b8-a648-4140-913e-1d1c80a6ffff</id>
+        <link href="TEST"/>
+        <updated>2023-10-30T17:17:04.953Z</updated>
+        <author>
+            <name>TEST</name>
+        </author>
+        <published>2023-10-30T17:17:04.953Z</published>
+    </entry>
+</feed>
