@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import { parseString } from "xml2js";
 import extractAtomData from "../utils/extractAtomData.js";
 import createHttpError from "http-errors";
+import fetch from "node-fetch";
 
 const mainRoute = Router();
 const __dirname = createDirname(import.meta.url);
@@ -23,19 +24,19 @@ const atomURLs = [
 
 mainRoute
   .route("/")
-  // This endpoint returns the atom file with all of our local data
-  .get((req, res, next) => {
+  .get(async (req, res, next) => {
     let allRows = [];
 
-    // Iterate through each URL and fetch Atom data
-    Promise.all(
-      atomURLs.map((url) => fetchAtomData(url))
-    )
-      .then((atomDataArray) => {
-        // Concatenate all Atom data arrays into one array
-        allRows = atomDataArray.flat();
+    try {
+      // Итерируем по каждому URL и получаем данные Atom
+      const atomDataArray = await Promise.all(
+        atomURLs.map((url) => fetchAtomData(url))
+      );
 
-      //setting the header information for the ATOM file
+      // Конкатенируем все массивы данных Atom в один массив
+      allRows = atomDataArray.flat();
+
+      // Установка заголовка для файла ATOM
       let feed = new Feed({
         title: "Events Feed",
         author: {
@@ -43,8 +44,8 @@ mainRoute
         },
       });
 
-      //Add each databse entry into the atom file
-      rows.forEach((row) => {
+      // Добавление каждой записи из базы данных в файл ATOM
+      allRows.forEach((row) => {
         const { title, link, id, published, updated, summary, author } = row;
         feed.addItem({
           title: title,
@@ -61,14 +62,16 @@ mainRoute
         });
       });
 
-      // Write to the file, and if the write is successful, send it
+      // Запись в файл, и если запись успешна, отправка файла
       fs.writeFile(atomFilePath, feed.atom1(), (err) => {
         if (err) next(err);
         else {
           res.status(200).sendFile(atomFilePath);
         }
       });
-    });
+    } catch (error) {
+      next(error);
+    }
   })
   .post((req, res, next) => {
     const currentDate = new Date();
@@ -89,8 +92,7 @@ mainRoute
     res.status(200).send("New record entered");
   });
 
-// Injests information from outside Atom files and adds it to our DB
-mainRoute.route("/atom").put((req, res) => {
+mainRoute.route("/atom").put((req, res, next) => {
   const atomURL = req.body.atomURL;
   fetch(atomURL)
     .then((response) => response.text())
@@ -116,7 +118,6 @@ mainRoute.route("/atom").put((req, res) => {
     });
 });
 
-// Function to fetch Atom data from a given URL
 async function fetchAtomData(url) {
   try {
     const response = await fetch(url);
