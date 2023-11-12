@@ -13,14 +13,27 @@ const mainRoute = Router();
 const __dirname = createDirname(import.meta.url);
 const atomFilePath = path.join(__dirname, "../atomfile/atom.xml");
 let sql;
+const atomURLs = [
+  "https://gioele.uber.space/k/fdla2023/feed1.atom",
+  "https://fdla-atom-feed.xyz/feed",
+  "https://fdla-event-manager.fly.dev/feed",
+  "http://juvicha.pythonanywhere.com/atom.xml",
+  "https://fdla-backend-project.onrender.com/",
+];
 
 mainRoute
   .route("/")
   // This endpoint returns the atom file with all of our local data
   .get((req, res, next) => {
-    let sql = `SELECT * from events`;
-    db.all(sql, [], async (err, rows) => {
-      if (err) next(err);
+    let allRows = [];
+
+    // Iterate through each URL and fetch Atom data
+    Promise.all(
+      atomURLs.map((url) => fetchAtomData(url))
+    )
+      .then((atomDataArray) => {
+        // Concatenate all Atom data arrays into one array
+        allRows = atomDataArray.flat();
 
       //setting the header information for the ATOM file
       let feed = new Feed({
@@ -102,5 +115,22 @@ mainRoute.route("/atom").put((req, res) => {
       });
     });
 });
+
+// Function to fetch Atom data from a given URL
+async function fetchAtomData(url) {
+  try {
+    const response = await fetch(url);
+    const xmlString = await response.text();
+    return new Promise((resolve, reject) => {
+      parseString(xmlString, (err, result) => {
+        if (err) reject(err);
+        const atomData = extractAtomData(result);
+        resolve(atomData);
+      });
+    });
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
 
 export default mainRoute;
