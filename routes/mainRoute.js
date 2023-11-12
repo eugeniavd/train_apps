@@ -22,21 +22,53 @@ const atomURLs = [
   "https://fdla-backend-project.onrender.com/",
 ];
 
+// Function to fetch Atom data from a given URL with retry mechanism and increased timeout
+async function fetchAtomDataWithRetry(url, maxRetries = 2, timeout = 60000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Attempt ${attempt} to fetch data from: ${url}`);
+      const response = await fetch(url, { timeout });
+      console.log(`Response status for attempt ${attempt}: ${response.status}`);
+      return await response.text();
+    } catch (error) {
+      console.error(`Attempt ${attempt} failed. Error: ${error.message}`);
+      if (attempt < maxRetries) {
+        console.log(`Retrying...`);
+        continue;
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
+// Function to fetch Atom data from a given URL
+async function fetchAtomData(url) {
+  try {
+    console.log(`Fetching data from: ${url}`);
+    const response = await fetch(url);
+    console.log(`Response status: ${response.status}`);
+    return await response.text();
+  } catch (error) {
+    throw error;
+  }
+}
+
 mainRoute
   .route("/")
   .get(async (req, res, next) => {
     let allRows = [];
 
     try {
-      // Итерируем по каждому URL и получаем данные Atom
+      // Iterate through each URL and fetch Atom data
       const atomDataArray = await Promise.all(
-        atomURLs.map((url) => fetchAtomData(url))
+        atomURLs.map((url) => fetchAtomDataWithRetry(url))
       );
 
-      // Конкатенируем все массивы данных Atom в один массив
+      // Concatenate all Atom data arrays into one array
       allRows = atomDataArray.flat();
 
-      // Установка заголовка для файла ATOM
+      // Setting the header information for the ATOM file
       let feed = new Feed({
         title: "Events Feed",
         author: {
@@ -44,7 +76,7 @@ mainRoute
         },
       });
 
-      // Добавление каждой записи из базы данных в файл ATOM
+      // Add each database entry into the atom file
       allRows.forEach((row) => {
         const { title, link, id, published, updated, summary, author } = row;
         feed.addItem({
@@ -62,14 +94,16 @@ mainRoute
         });
       });
 
-      // Запись в файл, и если запись успешна, отправка файла
+      // Write to the file, and if the write is successful, send it
       fs.writeFile(atomFilePath, feed.atom1(), (err) => {
         if (err) next(err);
         else {
+          console.log("ATOM file written successfully");
           res.status(200).sendFile(atomFilePath);
         }
       });
     } catch (error) {
+      console.error(`Error in GET request: ${error.message}`);
       next(error);
     }
   })
@@ -85,53 +119,51 @@ mainRoute
       sql,
       [randomUUID(), title, link, currentDate, currentDate, summary, author],
       (err) => {
-        return next(err);
+        if (err) {
+          console.error(`Error in POST request: ${err.message}`);
+          return next(err);
+        }
+        console.log("New record entered successfully");
+        res.status(200).send("New record entered");
       }
     );
-
-    res.status(200).send("New record entered");
   });
 
-mainRoute.route("/atom").put((req, res, next) => {
+mainRoute.route("/atom").put(async (req, res, next) => {
   const atomURL = req.body.atomURL;
-  fetch(atomURL)
-    .then((response) => response.text())
-    .then((str) => {
-      parseString(str, function (err, result) {
-        const atomData = extractAtomData(result);
 
-        atomData.forEach((data) => {
-          const { id, title, link, published, updated, summary, author } = data;
-
-          sql = `INSERT INTO events(id, title, link, published, updated, summary, author) VALUES (?,?,?,?,?,?,?)`;
-          db.run(
-            sql,
-            [id, title, link, published, updated, summary, author.name[0]],
-            (err) => {
-              next(err);
-            }
-          );
-
-          res.status(200).send("New ATOM file entered");
-        });
-      });
-    });
-});
-
-async function fetchAtomData(url) {
   try {
-    const response = await fetch(url);
-    const xmlString = await response.text();
-    return new Promise((resolve, reject) => {
-      parseString(xmlString, (err, result) => {
-        if (err) reject(err);
-        const atomData = extractAtomData(result);
-        resolve(atomData);
+    const xmlString = await fetchAtomDataWithRetry(atomURL);
+    parseString(xmlString, function (err, result) {
+      if (err) {
+        console.error(`Error parsing XML: ${err.message}`);
+        return next(err);
+      }
+
+      const atomData = extractAtomData(result);
+
+      atomData.forEach((data) => {
+        const { id, title, link, published, updated, summary, author } = data;
+
+        sql = `INSERT INTO events(id, title, link, published, updated, summary, author) VALUES (?,?,?,?,?,?,?)`;
+        db.run(
+          sql,
+          [id, title, link, published, updated, summary, author.name[0]],
+          (err) => {
+            if (err) {
+              console.error(`Error inserting into DB: ${err.message}`);
+              return next(err);
+            }
+            console.log("New ATOM file entry entered successfully");
+            res.status(200).send("New ATOM file entered");
+          }
+        );
       });
     });
   } catch (error) {
-    return Promise.reject(error);
+    console.error(`Error in PUT request: ${error.message}`);
+    next(error);
   }
-}
+});
 
 export default mainRoute;
