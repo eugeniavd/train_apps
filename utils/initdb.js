@@ -8,7 +8,7 @@ const initdb = () => {
   const dbPath = path.join(__dirname, "../db/events.db");
   if (!fs.existsSync(dbPath)) {
     const sql =
-      "CREATE TABLE events(id, title, link, published, updated, summary, author, CONSTRAINT unique_id_constraint UNIQUE (id))";
+      "CREATE TABLE events(id, title, link, published, updated, summary, author, source_url, CONSTRAINT unique_id_constraint UNIQUE (id))";
     db.run(sql);
   }
 };
