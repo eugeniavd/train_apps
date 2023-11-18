@@ -1,6 +1,4 @@
-// Import necessary modules and dependencies
-
-const extractAtomData = (rawAtomData, sourceURL) => {
+const extractAtomData = (rawAtomData) => {
   let processedData = [];
   const atomData = rawAtomData.feed.entry;
 
@@ -18,14 +16,15 @@ const extractAtomData = (rawAtomData, sourceURL) => {
     }
 
     let individualEntry = {
-      title: typeof entryTitle === "string" ? entryTitle : "",
+      title: typeof entryTitle === "string"? entryTitle : "",
+      // title: "TEST TITLE",
       link: link?.[0]?.$?.href || "",
       id: id?.[0] || "",
       published: published?.[0] || "",
       updated: updated?.[0] || "",
       summary: entrySummary || "",
+      // summary: "TEST SUMMARY",
       author: author?.[0] || "",
-      sourceURL: sourceURL || "", // Include source URL in each entry
     };
 
     processedData.push(individualEntry);
