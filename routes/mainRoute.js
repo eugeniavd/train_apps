@@ -29,7 +29,7 @@ async function fetchAtomDataWithRetry(url, maxRetries = 2, timeout = 60000) {
       console.log(`Attempt ${attempt} to fetch data from: ${url}`);
       const response = await fetch(url, { timeout });
       console.log(`Response status for attempt ${attempt}: ${response.status}`);
-      return await response.text();
+      return await response.text(); //return xml feed as string
     } catch (error) {
       console.error(`Attempt ${attempt} failed. Error: ${error.message}`);
       if (attempt < maxRetries) {
@@ -65,8 +65,22 @@ mainRoute
         atomURLs.map((url) => fetchAtomDataWithRetry(url))
       );
 
+      console.log("All Atom data fetched successfully");
+
       // Concatenate all Atom data arrays into one array
-      allRows = atomDataArray.flat();
+      allRows = atomDataArray.map((xmlString) => {
+        let rows = [];
+        parseString(xmlString, function (err, result) {
+          if (err) {
+            console.error(`Error parsing XML: ${err.message}`);
+            return next(err);
+          }
+          rows = extractAtomData(result);
+        });
+        return rows;
+      }).flat();
+
+      // console.log("allRows", allRows);
 
       // Setting the header information for the ATOM file
       let feed = new Feed({
@@ -76,9 +90,15 @@ mainRoute
         },
       });
 
+      console.log("Setting up ATOM file");
+
       // Add each database entry into the atom file
       allRows.forEach((row) => {
+        // console.table(row);
+        // row is an xml string
+        // parse row to get the data
         const { title, link, id, published, updated, summary, author } = row;
+        console.log({ title, link, id, published, updated, summary, author });
         feed.addItem({
           title: title,
           id: id,
@@ -93,6 +113,10 @@ mainRoute
           ],
         });
       });
+
+      console.log("ATOM file set up successfully");
+
+      // console.log("feed", feed.atom1());
 
       // Write to the file, and if the write is successful, send it
       fs.writeFile(atomFilePath, feed.atom1(), (err) => {
