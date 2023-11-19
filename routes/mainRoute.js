@@ -153,41 +153,80 @@ mainRoute
     );
   });
 
-mainRoute.route("/atom").put(async (req, res, next) => {
-  const atomURL = req.body.atomURL;
-
-  try {
-    const xmlString = await fetchAtomDataWithRetry(atomURL);
-    parseString(xmlString, function (err, result) {
-      if (err) {
-        console.error(`Error parsing XML: ${err.message}`);
-        return next(err);
-      }
-
-      const atomData = extractAtomData(result);
-
-      atomData.forEach((data) => {
-        const { id, title, link, published, updated, summary, author } = data;
-
-        sql = `INSERT INTO events(id, title, link, published, updated, summary, author) VALUES (?,?,?,?,?,?,?)`;
-        db.run(
-          sql,
-          [id, title, link, published, updated, summary, author.name[0]],
-          (err) => {
+  mainRoute.route("/atom").put(async (req, res, next) => {
+    const atomURL = req.body.atomURL;
+  
+    try {
+      const xmlString = await fetchAtomDataWithRetry(atomURL);
+      parseString(xmlString, function (err, result) {
+        if (err) {
+          console.error(`Error parsing XML: ${err.message}`);
+          return next(err);
+        }
+  
+        const atomData = extractAtomData(result);
+  
+        atomData.forEach((data) => {
+          const { id, title, link, published, updated, summary, author } = data;
+  
+          // Check if an entry with the same ID already exists in the database
+          const checkQuery = `SELECT * FROM events WHERE id = ?`;
+          db.get(checkQuery, [id], (err, existingEntry) => {
             if (err) {
-              console.error(`Error inserting into DB: ${err.message}`);
+              console.error(`Database error: ${err.message}`);
               return next(err);
             }
-            console.log("New ATOM file entry entered successfully");
-            res.status(200).send("New ATOM file entered");
-          }
-        );
+  
+            if (existingEntry) {
+              // If entry exists, compare the update times to determine which one to keep
+              const existingUpdateTime = new Date(existingEntry.updated);
+              const incomingUpdateTime = new Date(updated);
+  
+              if (incomingUpdateTime > existingUpdateTime) {
+                // If incoming entry has a newer update time, update the existing entry
+                sql = `UPDATE events 
+                       SET title = ?, link = ?, published = ?, updated = ?, summary = ?, author = ? 
+                       WHERE id = ?`;
+                db.run(
+                  sql,
+                  [title, link, published, updated, summary, author.name[0], id],
+                  (err) => {
+                    if (err) {
+                      console.error(`Error updating entry in DB: ${err.message}`);
+                      return next(err);
+                    }
+                    console.log("Existing entry updated successfully");
+                    res.status(200).send("Existing entry updated");
+                  }
+                );
+              } else {
+                // If incoming entry has an older update time, skip insertion
+                console.log("Incoming entry is older, skipping insertion");
+                res.status(200).send("Incoming entry is older");
+              }
+            } else {
+              // If no entry exists, insert the new entry into the database
+              sql = `INSERT INTO events(id, title, link, published, updated, summary, author) VALUES (?,?,?,?,?,?,?)`;
+              db.run(
+                sql,
+                [id, title, link, published, updated, summary, author.name[0]],
+                (err) => {
+                  if (err) {
+                    console.error(`Error inserting into DB: ${err.message}`);
+                    return next(err);
+                  }
+                  console.log("New ATOM file entry entered successfully");
+                  res.status(200).send("New ATOM file entry entered");
+                }
+              );
+            }
+          });
+        });
       });
-    });
-  } catch (error) {
-    console.error(`Error in PUT request: ${error.message}`);
-    next(error);
-  }
-});
+    } catch (error) {
+      console.error(`Error in PUT request: ${error.message}`);
+      next(error);
+    }
+  });
 
 export default mainRoute;
