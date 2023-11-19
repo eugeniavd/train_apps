@@ -1,7 +1,5 @@
-import { fileURLToPath } from "url";
-import { dirname } from "path";
-
-//Setting up the correct file pathway to our DB
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const createDirname = (url) => {
   const __filename = fileURLToPath(url);
